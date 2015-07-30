@@ -7,11 +7,11 @@ require_once('Bot.php');
  */
 class BlasphemyBot extends Bot {
     protected function about($aJson) {
-        return $this->sendMessage($this->getChatId($aJson), "This bot can help you when you need to swear but you're out of words.\nDeveloped by @Nappa85");
+        return $this->sendMessage($this->getChatId($aJson), "This bot can help you when you need to swear but you're out of words.\n\nDeveloped by @Nappa85 under GPLv4\nSource code: https://github.com/nappa85/Telegram");
     }
 
     protected function help($aJson) {
-        return $this->sendMessage($this->getChatId($aJson), "/swear - A generic swear\n/swearto - Swear about your favourite subject\n/blackhumor - Some good old black humor\n/suggest - Suggest an improvement to the developer");
+        return $this->sendMessage($this->getChatId($aJson), "/swear - A generic swear\n\n/swearto - Swear about your favourite subject\nYou can pass an inline argument, or call the command and insert the subject when asked.\nFor example:\n/swearto the developer of @BlasphemyBot\n\n/blackhumor - Some good old black humor\n\n/suggest - Suggest an improvement to the developer\nYou can pass an inline argument, or call the command and insert the subject when asked.\nFor example:\n/suggest I have a new blackhumor line for you!");
     }
 
     /**

@@ -7,11 +7,11 @@ require_once('Bot.php');
  */
 class MemeGeneratorBot extends Bot {
     protected function about($aJson) {
-        return $this->sendMessage($this->getChatId($aJson), "This bot gives you the ability to create Memes on the fly.\nDeveloped by @Nappa85");
+        return $this->sendMessage($this->getChatId($aJson), "This bot gives you the ability to create Memes on the fly.\n\nDeveloped by @Nappa85 under GPLv4\nSource code: https://github.com/nappa85/Telegram");
     }
 
     protected function help($aJson) {
-        return $this->sendMessage($this->getChatId($aJson), "/listMemes - List avaiable Memes (you can specify the length of the list, default is 10, or a string to filter by)\n/newMeme - Generate a new Meme\n/suggest - Suggest an improvement to the developer");
+        return $this->sendMessage($this->getChatId($aJson), "/listMemes - List avaiable Memes\nYou can specify the length of the list, default is 10, or a string to filter by.\nFor example:\n/listMemes 50\n/listMemes batman\n\n/newMeme - Generate a new Meme\nYou will be asked for an ID or a search string for the Meme, then for the first and the second texts.\nIf a search string is provided, the first matching Meme will be used.\nIf you need to leave empty one of the two strings, use the \"-\" character.\n\n/suggest - Suggest an improvement to the developer\nYou can pass an inline argument, or call the command and insert the subject when asked.\nFor example:\n/suggest How can I add a new Meme image to the list?");
     }
 
     protected function _getList() {
