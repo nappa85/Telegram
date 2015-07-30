@@ -5,15 +5,9 @@ if(($_SERVER["HTTP_X_FORWARDED_SERVER"] != "ssl.altervista.org") || ($_SERVER["H
     exit(0);
 }
 
-require_once('Slim-2.6.2/Slim/Slim.php');
+if(preg_match('/^\/Telegram\/([^\/]+)\/([^\/]+)/', $_SERVER['SCRIPT_URL'], $aMatch)) {
+    require_once('classes/'.$aMatch[1].'.php');
 
-\Slim\Slim::registerAutoloader();
-
-$oApp = new \Slim\Slim();
-$oApp->post('/:bot/:secret', function($sBotName, $sToken) {
-    require_once('classes/'.$sBotName.'.php');
-
-    $oBot = new $sBotName($sToken);
+    $oBot = new $aMatch[1]($aMatch[2]);
     $oBot->parse(file_get_contents('php://input'));
-});
-$oApp->run();
+}
