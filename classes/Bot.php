@@ -16,7 +16,7 @@ abstract class Bot {
      * Config flag to switch between php sessions and files storage
      * @type bool
      */
-    protected $bUseSessions = false;
+    protected $bUseSessions = true;
 
     /**
      * Checks if the received tocken matches with the Bot secret tocken
@@ -38,12 +38,9 @@ abstract class Bot {
         $sMethod = null;
         $aJson = json_decode($sJson, true);
 
-        //$this->bUseSessions = ($aJson['message']['from']['id'] == 25900594);//debug
         if($this->bUseSessions) {
-            //FileSessionHandler::start($this->getChatId($aJson));
-            session_id($this->getChatId($aJson));
+            session_id(get_called_class().$this->getChatId($aJson));
             session_start();
-            $this->sendMessage($this->aConfig['DEVELOPER_CHAT_ID'], '$_SESSION('.session_id().') = '.var_export($_SESSION, true));
         }
 
         $sText = $this->getMessageText($aJson);
@@ -152,7 +149,7 @@ abstract class Bot {
      */
     protected function storedMessage($sChatId, $sMessageId) {
         if($this->bUseSessions) {
-            return array_key_exists($sMessageId, $_SESSION);
+            return array_key_exists('m'.$sMessageId, $_SESSION);
         }
         else {
             return file_exists(__DIR__.'/../stored_messages/'.$sChatId.'/'.$sMessageId.'.json');
@@ -165,7 +162,7 @@ abstract class Bot {
      */
     protected function storeMessage($aJson) {
         if($this->bUseSessions) {
-            $_SESSION[$this->getMessageId($aJson)] = $aJson;
+            $_SESSION['m'.$this->getMessageId($aJson)] = $aJson;
             return true;
         }
         else {
@@ -209,7 +206,7 @@ abstract class Bot {
      */
     protected function retrieveMessage($sChatId, $sMessageId) {
         if($this->bUseSessions) {
-            return $_SESSION[$sMessageId];
+            return $_SESSION['m'.$sMessageId];
         }
         else {
             return json_decode(file_get_contents(__DIR__.'/../stored_messages/'.$sChatId.'/'.$sMessageId.'.json'), true);
