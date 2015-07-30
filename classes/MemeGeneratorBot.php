@@ -25,7 +25,7 @@ class MemeGeneratorBot extends Bot {
         $sSearch = preg_replace('/\W+/', '', strtolower($sSearch));
 
         foreach($aMemes['data']['memes'] as $aMeme) {
-            if(($aMeme['id'] == $sSearch) || ($sSearch == preg_replace('/\W+/', '', strtolower($aMeme['name'])))) {
+            if(($aMeme['id'] == $sSearch) || (strpos(preg_replace('/\W+/', '', strtolower($aMeme['name'])), $sSearch) !== false)) {
                 return $aMeme['id'];
             }
         }
