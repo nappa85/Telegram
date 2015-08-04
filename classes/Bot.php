@@ -240,7 +240,13 @@ abstract class Bot {
      * @returns bool
      */
     protected function deleteMessage($sChatId, $sMessageId) {
-        return unlink(__DIR__.'/../stored_messages/'.$sChatId.'/'.$sMessageId.'.json');
+        if($this->bUseSessions) {
+            unset($_SESSION['m'.$sMessageId]);
+            return true;
+        }
+        else {
+            return unlink(__DIR__.'/../stored_messages/'.$sChatId.'/'.$sMessageId.'.json');
+        }
     }
 
     /**
