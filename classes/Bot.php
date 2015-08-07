@@ -255,7 +255,8 @@ abstract class Bot {
      * @param   $message        string  the message
      * @param   $reply_id       string  the message being replied
      * @param   $forced_reply   bool    tells if the user MUST reply
-     * @returns string
+     * @param   $preview        bool    tells if the message will contains a preview
+     * @returns array
      */
     protected function sendMessage($sChatId, $sMessage, $sReplyId = null, $bForceReply = false, $bPreview = true) {
         $aParams = array(
@@ -279,10 +280,62 @@ abstract class Bot {
     }
 
     /**
+     * Sends a photo to a specified chat
+     * @param   $chat_id        string  the chat's id
+     * @param   $message        string  the message
+     * @param   $reply_id       string  the message being replied
+     * @param   $forced_reply   bool    tells if the user MUST reply
+     * @returns array
+     */
+    protected function sendPhoto($sChatId, $sPhoto, $sCaption = null, $sReplyId = null, $bForceReply = false, $bPreview = true) {
+        $aParams = array(
+            'chat_id' => $sChatId,
+            'photo' => $sPhoto,
+        );
+
+        if(!is_null($sCaption)) {
+            $aParams['caption'] = $sCaption;
+        }
+
+        if(!is_null($sReplyId)) {
+            $aParams['reply_to_message_id'] = $sReplyId;
+        }
+
+        if($bForceReply) {
+            $aParams['reply_markup'] = '{"force_reply":true,"selective":true}';
+        }
+
+        if(!$bPreview) {
+            $aParams['disable_web_page_preview'] = 'true';
+        }
+
+        return $this->callTelegram('sendPhoto', $aParams);
+    }
+
+    /**
+     * Sets an action for the specified chat
+     * @param   $chat_id    string  the chat's id
+     * @param   $action     string  the action
+     * @returns array
+     */
+    protected function sendChatAction($sChatId, $sAction) {
+        $aPossibleActions = array('typing' ,'upload_photo' ,'record_video' ,'upload_video' ,'record_audio' ,'upload_audio' ,'upload_document' ,'find_location');
+        if(in_array($sAction, $aPossibleActions)) {
+            return $this->callTelegram('sendChatAction', array(
+                'chat_id' => $sChatId,
+                'action' => $sAction,
+            ));
+        }
+        else {
+            return false;
+        }
+    }
+
+    /**
      * Sends a command to the Telegram server
      * @param   $method     string  the chat's id
      * @param   $arguments  string  the message
-     * @returns string
+     * @returns array
      */
     protected function callTelegram($sMethod, $aArguments) {
         $rCurl = curl_init();
