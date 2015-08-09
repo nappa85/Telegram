@@ -288,6 +288,22 @@ abstract class Bot {
      * @returns array
      */
     protected function sendPhoto($sChatId, $sPhoto, $sCaption = null, $sReplyId = null, $bForceReply = false, $bPreview = true) {
+        //download remote files to temp file
+        if(substr($sPhoto, 0, 4) == 'http') {
+            $sTempFile = tempnam(sys_get_temp_dir(), 'img');
+            File_put_contents($sTempFile, file_get_contents($sPhoto));
+
+            //Telegram pretends the file with the correct extension
+            $aInfo = getimagesize($sTempFile);
+            $sExt = image_type_to_extension($aInfo[2]);
+            rename($sTempFile, $sTempFile.$sExt);
+            $sTempFile .= $sExt;
+            $sPhoto = '@'.$sTempFile;
+        }
+        else {
+            $sTempFile = false;
+        }
+
         $aParams = array(
             'chat_id' => $sChatId,
             'photo' => $sPhoto,
@@ -309,7 +325,13 @@ abstract class Bot {
             $aParams['disable_web_page_preview'] = 'true';
         }
 
-        return $this->callTelegram('sendPhoto', $aParams);
+        $aRes = $this->callTelegram('sendPhoto', $aParams);
+
+        if($sTempFile) {
+            unlink($sTempFile);
+        }
+
+        return $aRes;
     }
 
     /**
