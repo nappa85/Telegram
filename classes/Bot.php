@@ -288,10 +288,12 @@ abstract class Bot {
      * @returns array
      */
     protected function sendPhoto($sChatId, $sPhoto, $sCaption = null, $sReplyId = null, $bForceReply = false, $bPreview = true) {
+	$this->sendChatAction($sChatId, 'upload_photo');
+
         //download remote files to temp file
         if(substr($sPhoto, 0, 4) == 'http') {
             $sTempFile = tempnam(sys_get_temp_dir(), 'img');
-            File_put_contents($sTempFile, file_get_contents($sPhoto));
+            file_put_contents($sTempFile, file_get_contents($sPhoto));
 
             //Telegram pretends the file with the correct extension
             $aInfo = getimagesize($sTempFile);
