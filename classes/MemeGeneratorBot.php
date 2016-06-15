@@ -18,15 +18,75 @@ class MemeGeneratorBot extends Bot {
         return json_decode(file_get_contents('https://api.imgflip.com/get_memes'), true);
     }
 
-    public function _getTemplateId($sSearch) {
-        $aMemes = $this->_getList();
+    protected function _getTemplateId($sSearch) {
+        //check if it's already a valid id
+        if(is_numeric($sSearch)) {
+            $rCurl = curl_init();
+            curl_setopt_array($rCurl, array(
+                CURLOPT_URL => 'https://imgflip.com/memegenerator/'.$sSearch,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_USERAGENT => 'Mozilla/5.0 (X11; Linux x86_64; rv:47.0) Gecko/20100101 Firefox/47.0',
+                CURLOPT_REFERER => 'https://imgflip.com/memegenerator',
+                CURLOPT_HEADER => true,
+            ));
+            $sResponse = curl_exec($rCurl);
+            curl_close($rCurl);
 
-        //doesn't affects numeric strings
-        $sSearch = preg_replace('/\W+/', '', strtolower($sSearch));
+            if(!preg_match('/location\: \/memegenerator/', $sResponse)) {
+                return $sSearch;
+            }
+        }
+        else {
+            $aMemes = $this->_getList();
 
-        foreach($aMemes['data']['memes'] as $aMeme) {
-            if(($aMeme['id'] == $sSearch) || (strpos(preg_replace('/\W+/', '', strtolower($aMeme['name'])), $sSearch) !== false)) {
-                return $aMeme['id'];
+            //doesn't affects numeric strings
+            $sSearch = preg_replace('/\W+/', '', strtolower($sSearch));
+
+            foreach($aMemes['data']['memes'] as $aMeme) {
+                if(($aMeme['id'] == $sSearch) || (!empty($sSearch) && (strpos(preg_replace('/\W+/', '', strtolower($aMeme['name'])), $sSearch) !== false))) {
+                    return $aMeme['id'];
+                }
+            }
+        }
+
+        return false;
+    }
+
+    protected function _uploadImage(&$aJson) {
+        if(is_array($aJson['message']['photo'])) {
+            //scan various formats to select the best one, max 20MB
+            $iBestIndex = 0;
+            foreach($aJson['message']['photo'] as $iIndex => $aPhoto) {
+                if(($aJson['message']['photo'][$iBestIndex]['file_size'] < $aPhoto['file_size']) && ($aPhoto['file_size'] < 20971520)) {
+                    $iBestIndex = $iIndex;
+                }
+            }
+
+            $sTempFile = $this->getFile($aJson['message']['photo'][$iBestIndex]['file_id']);
+            if($sTempFile === false) {
+                return false;
+            }
+
+            $rCurl = curl_init();
+            curl_setopt_array($rCurl, array(
+                CURLOPT_URL => 'https://imgflip.com/memeAdd',
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => 1,
+                CURLOPT_POSTFIELDS => array(
+                    'memeFile' => new CurlFile($sTempFile),
+                    'customName' => '',
+                ),
+                CURLOPT_USERAGENT => 'Mozilla/5.0 (X11; Linux x86_64; rv:47.0) Gecko/20100101 Firefox/47.0',
+                CURLOPT_REFERER => 'https://imgflip.com/memegenerator',
+                CURLOPT_HEADER => true,
+            ));
+            $sResponse = curl_exec($rCurl);
+            curl_close($rCurl);
+
+            if(preg_match('/location\: \/memegenerator\/(\d+)/', $sResponse, $aMatch)) {
+                //replace message text to replace future args element
+                $aJson['message']['text'] = $aMatch[1];
+                return $aMatch[1];
             }
         }
 
@@ -77,7 +137,7 @@ class MemeGeneratorBot extends Bot {
         if($iCount > 1) {
             //scan last 3 parameters
             for($i = ($iCount > 3?$iCount - 3:1); $i < $iCount; $i++) {
-                if(empty($aParams['template_id']) && ($iTemplateId = $this->_getTemplateId($aArgs[$i]))) {
+                if(empty($aParams['template_id']) && (($iTemplateId = $this->_uploadImage($aJson)) || ($iTemplateId = $this->_getTemplateId($aArgs[$i])))) {
                     $aParams['template_id'] = $iTemplateId;
                 }
                 elseif(!empty($aParams['template_id']) && empty($aParams['text0'])) {
@@ -91,7 +151,7 @@ class MemeGeneratorBot extends Bot {
 
         if(empty($aParams['template_id'])) {
             $this->storeMessage($aJson);
-            return $this->storeMessage($this->sendMessage($this->getChatId($aJson), "Insert a meme name or ID\nYou can use /listMemes to retrieve a list of avaiable Memes\nThe list comes in \"name (ID) link\" format", $this->getMessageId($aJson), true));
+            return $this->storeMessage($this->sendMessage($this->getChatId($aJson), "Insert a meme name or ID\nYou can use /listMemes to retrieve a list of avaiable Memes\nThe list comes in \"name (ID) link\" format.\nIf you can't find your meme, you can upload an image instead.", $this->getMessageId($aJson), true));
         }
         elseif(empty($aParams['text0'])) {
             $this->storeMessage($aJson);
@@ -120,7 +180,15 @@ class MemeGeneratorBot extends Bot {
         curl_close($rCurl);
 
         $aResponse = json_decode($sResponse, true);
-        $this->sendMessage($this->getChatId($aJson), $aResponse['success']?$aResponse['data']['page_url']:$aResponse['error_message']);
+        if($aResponse['success']) {
+            $this->sendChatAction($this->getChatId($aJson), 'upload_photo');
+
+            $this->sendPhoto($this->getChatId($aJson), $aResponse['data']['url'], $aResponse['data']['page_url']);
+        }
+        else {
+            $this->sendMessage($this->getChatId($aJson), empty($aResponse['error_message'])?$aResponse['description']:$aResponse['error_message']);
+        }
+
         return $this->recursivelyDeleteMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
     }
 }

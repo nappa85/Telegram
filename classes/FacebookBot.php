@@ -117,6 +117,7 @@ abstract class FacebookBot extends Bot {
 			//skip like image
 			if(strpos($sImg, 'rsrc.php') === false) {
 			    $aRes['img'] = html_entity_decode($sImg);
+			    $aRes['text'] .= "\n".$aRes['img'];//debug
 			    break;
 			}
 		    }

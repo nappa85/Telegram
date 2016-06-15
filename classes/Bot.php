@@ -250,6 +250,26 @@ abstract class Bot {
     }
 
     /**
+     * Retrieves a file
+     * @param   $file_id        string  the file's id
+     * @returns string
+     */
+    protected function getFile($sFileId) {
+        $aResult = $this->callTelegram('getFile', array(
+            'file_id' => $sFileId
+        ));
+
+        if($aResult['ok']) {
+            //download the file to a temp path
+            $sTempFile = tempnam(null, 'file');
+            file_put_contents($sTempFile, file_get_contents('https://api.telegram.org/file/bot'.$this->aConfig['HTTP_TOKEN'].'/'.$aResult['result']['file_path']));
+            return $sTempFile;
+        }
+        
+        return false;
+    }
+
+    /**
      * Sends a message to a specified chat
      * @param   $chat_id        string  the chat's id
      * @param   $message        string  the message
@@ -282,25 +302,25 @@ abstract class Bot {
     /**
      * Sends a photo to a specified chat
      * @param   $chat_id        string  the chat's id
-     * @param   $message        string  the message
+     * @param   $photo          string  the photo
+     * @param   $caption        string  the caption
      * @param   $reply_id       string  the message being replied
      * @param   $forced_reply   bool    tells if the user MUST reply
+     * @param   $preview        bool    tells if the preview must be shown
      * @returns array
      */
     protected function sendPhoto($sChatId, $sPhoto, $sCaption = null, $sReplyId = null, $bForceReply = false, $bPreview = true) {
-	$this->sendChatAction($sChatId, 'upload_photo');
-
         //download remote files to temp file
         if(substr($sPhoto, 0, 4) == 'http') {
             $sTempFile = tempnam(sys_get_temp_dir(), 'img');
-            file_put_contents($sTempFile, file_get_contents($sPhoto));
+            File_put_contents($sTempFile, file_get_contents($sPhoto));
 
             //Telegram pretends the file with the correct extension
-            $aInfo = getimagesize($sTempFile);
-            $sExt = image_type_to_extension($aInfo[2]);
-            rename($sTempFile, $sTempFile.$sExt);
-            $sTempFile .= $sExt;
-            $sPhoto = '@'.$sTempFile;
+            if(preg_match('/(\.\w+)[^\.]*$/', $sPhoto, $aMatch)) {
+                rename($sTempFile, $sTempFile.$aMatch[1]);
+                $sTempFile .= $aMatch[1];
+                $sPhoto = $sTempFile;
+            }
         }
         else {
             $sTempFile = false;
@@ -308,7 +328,8 @@ abstract class Bot {
 
         $aParams = array(
             'chat_id' => $sChatId,
-            'photo' => $sPhoto,
+//             'photo' => '@'.$sPhoto,
+            'photo' => new CurlFile($sPhoto),
         );
 
         if(!is_null($sCaption)) {
@@ -328,6 +349,184 @@ abstract class Bot {
         }
 
         $aRes = $this->callTelegram('sendPhoto', $aParams);
+
+        if($sTempFile) {
+            unlink($sTempFile);
+        }
+
+        return $aRes;
+    }
+
+    /**
+     * Sends an audio message to a specified chat
+     * @param   $chat_id        string  the chat's id
+     * @param   $audio          string  the audio file
+     * @param   $duration       int     the duration of the audio
+     * @param   $performer      string  the performer of the audio file
+     * @param   $title          string  the title of the audio file
+     * @param   $reply_id       string  the message being replied
+     * @param   $forced_reply   bool    tells if the user MUST reply
+     * @returns array
+     */
+    protected function sendAudio($sChatId, $sAudio, $iDuration = null, $sPerformer = null, $sTitle = null, $sReplyId = null, $bForceReply = false) {
+        //download remote files to temp file
+        if(substr($sAudio, 0, 4) == 'http') {
+            $sTempFile = tempnam(sys_get_temp_dir(), 'audio');
+            File_put_contents($sTempFile, file_get_contents($sAudio));
+
+            //Telegram pretends the file with the correct extension
+            if(preg_match('/(\.\w+)[^\.]*^/', $sAudio, $aMatch)) {
+                rename($sTempFile, $sTempFile.$aMatch[1]);
+                $sTempFile .= $aMatch[1];
+                $sAudio = $sTempFile;
+            }
+        }
+        else {
+            $sTempFile = false;
+        }
+
+        $aParams = array(
+            'chat_id' => $sChatId,
+//             'audio' => '@'.$sAudio,
+            'audio' => new CurlFile($sAudio),
+        );
+
+        if(!is_null($iDuration)) {
+            $aParams['duration'] = $iDuration;
+        }
+
+        if(!is_null($sPerformer)) {
+            $aParams['performer'] = $sPerformer;
+        }
+
+        if(!is_null($sTitle)) {
+            $aParams['title'] = $sTitle;
+        }
+
+        if(!is_null($sReplyId)) {
+            $aParams['reply_to_message_id'] = $sReplyId;
+        }
+
+        if($bForceReply) {
+            $aParams['reply_markup'] = '{"force_reply":true,"selective":true}';
+        }
+
+        $aRes = $this->callTelegram('sendAudio', $aParams);
+
+        if($sTempFile) {
+            unlink($sTempFile);
+        }
+
+        return $aRes;
+    }
+
+    /**
+     * Sends a voice message to a specified chat
+     * @param   $chat_id        string  the chat's id
+     * @param   $voice          string  the voice file
+     * @param   $duration       int     the duration of the voice message
+     * @param   $reply_id       string  the message being replied
+     * @param   $forced_reply   bool    tells if the user MUST reply
+     * @returns array
+     */
+    protected function sendVoice($sChatId, $sVoice, $iDuration = null, $sReplyId = null, $bForceReply = false) {
+        //download remote files to temp file
+        if(substr($sVoice, 0, 4) == 'http') {
+            $sTempFile = tempnam(sys_get_temp_dir(), 'voice');
+            File_put_contents($sTempFile, file_get_contents($sVoice));
+
+            //Telegram pretends the file with the correct extension
+            if(preg_match('/(\.\w+)[^\.]*^/', $sVoice, $aMatch)) {
+                rename($sTempFile, $sTempFile.$aMatch[1]);
+                $sTempFile .= $aMatch[1];
+                $sVoice = $sTempFile;
+            }
+        }
+        else {
+            $sTempFile = false;
+        }
+
+        $aParams = array(
+            'chat_id' => $sChatId,
+//             'voice' => '@'.$sVoice,
+            'voice' => new CurlFile($sVoice),
+        );
+
+        if(!is_null($iDuration)) {
+            $aParams['duration'] = $iDuration;
+        }
+
+        if(!is_null($sReplyId)) {
+            $aParams['reply_to_message_id'] = $sReplyId;
+        }
+
+        if($bForceReply) {
+            $aParams['reply_markup'] = '{"force_reply":true,"selective":true}';
+        }
+
+        $aRes = $this->callTelegram('sendVoice', $aParams);
+
+        if($sTempFile) {
+            unlink($sTempFile);
+        }
+
+        return $aRes;
+    }
+
+    /**
+     * Sends a document to a specified chat
+     * @param   $chat_id        string  the chat's id
+     * @param   $document       string  the document
+     * @param   $reply_id       string  the message being replied
+     * @param   $forced_reply   bool    tells if the user MUST reply
+     * @returns array
+     */
+    protected function sendDocument($sChatId, $sDocument, $sReplyId = null, $bForceReply = false) {
+        //download remote files to temp file
+        if(substr($sDocument, 0, 4) == 'http') {
+//             $rCurl = curl_init();
+//             curl_setopt_array($rCurl, array(
+//                 CURLOPT_URL => $sDocument,
+//                 CURLOPT_SSL_VERIFYPEER => false,
+//                 CURLOPT_SSL_VERIFYHOST => 2,
+//                 CURLOPT_RETURNTRANSFER => true,
+//                 CURLOPT_HEADERFUNCTION => function($rCurl, $sHeaders) {
+//                     var_dump($sHeaders);
+//                     return strlen($sHeaders);
+//                 }
+//             ));
+//             $sResponse = curl_exec($rCurl);
+//             curl_close($rCurl);
+
+            $sTempFile = tempnam(sys_get_temp_dir(), 'doc');
+            File_put_contents($sTempFile, file_get_contents($sDocument));
+
+            //Telegram pretends the file with the correct extension
+            if(preg_match('/(\.\w+)[^\.]*$/', $sDocument, $aMatch)) {
+                rename($sTempFile, $sTempFile.$aMatch[1]);
+                $sTempFile .= $aMatch[1];
+                $sDocument = $sTempFile;
+            }
+        }
+        else {
+            $sTempFile = false;
+        }
+
+        $aParams = array(
+            'chat_id' => $sChatId,
+//             'document' => '@'.$sDocument,
+            'document' => new CurlFile($sDocument),
+        );
+
+        if(!is_null($sReplyId)) {
+            $aParams['reply_to_message_id'] = $sReplyId;
+        }
+
+        if($bForceReply) {
+            $aParams['reply_markup'] = '{"force_reply":true,"selective":true}';
+        }
+
+        $aRes = $this->callTelegram('sendDocument', $aParams);
 
         if($sTempFile) {
             unlink($sTempFile);
@@ -362,17 +561,52 @@ abstract class Bot {
      * @returns array
      */
     protected function callTelegram($sMethod, $aArguments) {
+//         $sBoundary = '7ZAUH3KVUpvXgwagBLkB4v7r84QBpj0TxAvNF';
+//         $sContents = '';
+// 
+//         foreach($aArguments as $sKey => $sValue) {
+//             if($sValue[0] == '@') {
+//                 $sContents .= '--'.$sBoundary."\r\nContent-Disposition: form-data; name=\"".$sKey."\"; filename=\"".basename($sValue)."\"\r\nContent-Encoding: base64\r\n\r\n".
+//                               implode("\r\n", str_split(base64_encode(file_get_contents(substr($sValue, 1))), 76))."\r\n";
+//             }
+//             else {
+//                 $sContents .= '--'.$sBoundary."\r\nContent-Disposition: form-data; name=\"".$sKey."\"\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n".$sValue."\r\n";
+//             }
+//         }
+//         $sContents .= '--'.$sBoundary."--\r\n";
+
         $rCurl = curl_init();
         curl_setopt_array($rCurl, array(
             CURLOPT_URL => 'https://api.telegram.org/bot'.$this->aConfig['HTTP_TOKEN'].'/'.$sMethod,
             CURLOPT_RETURNTRANSFER => true,
+//             CURLOPT_HTTPHEADER => array(
+//                 'Host: api.telegram.org',
+//                 'Content-Type: multipart/form-data; boundary='.$sBoundary,
+//                 'Content-Length: '.strlen($sContents),
+//                 'Connection: Keep-Alive'
+//             ),
             CURLOPT_POST => 1,
+//             CURLOPT_POSTFIELDS => $sContents
             CURLOPT_POSTFIELDS => $aArguments
         ));
         $sResponse = curl_exec($rCurl);
+
+        if($sResponse === false) {
+            $aRes = array(
+                'ok' => false,
+                'description' => curl_error($rCurl)
+            );
+        }
+        else {
+            $aRes = json_decode($sResponse, true);
+        }
         curl_close($rCurl);
 
-        return json_decode($sResponse, true);
+        return $aRes;
+    }
+
+    protected function getMedia($sFilename) {
+        return __DIR__.'/../media/'.get_called_class().'/'.$sFilename;
     }
 
     protected function suggest($aJson, $sSuggestion) {

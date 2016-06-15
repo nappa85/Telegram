@@ -1,11 +1,11 @@
 <?php
 
 //this security check should be parametrized
-if(($_SERVER["HTTP_X_FORWARDED_SERVER"] != "ssl.altervista.org") || ($_SERVER["HTTP_X_FORWARDED_HOST"] != "nappa85.ssl.altervista.org")) {
+if(($_SERVER["HTTP_X_FORWARDED_PROTO"] != "https") || ($_SERVER["HTTP_X_FORWARDED_PORT"] != "443")) {
     exit(0);
 }
 
-if(preg_match('/^\/Telegram\/([^\/]+)\/([^\/]+)/', $_SERVER['SCRIPT_URL'], $aMatch)) {
+if(preg_match('/^\/Telegram\/([^\/]+)\/([^\/]+)/', $_SERVER['REQUEST_URI'], $aMatch)) {
     require_once('classes/'.$aMatch[1].'.php');
 
     $oBot = new $aMatch[1]($aMatch[2]);
