@@ -129,12 +129,30 @@ abstract class Bot {
      * @returns array
      */
     protected function getMethodAndArguments($sMessage) {
-        if(preg_match('/^\/([^\s\@]+)\S*\s*(.*)$/', $sMessage, $aMatch)) {
+        if(preg_match('/^\/(\S+)\s*(.*)$/', $sMessage, $aMatch)) {
             $aParts = array();
-            if(!empty($aMatch[2])) {
-                $aParts[] = $aMatch[2];
+
+            //check if botname has been specified
+            if(strpos($aMatch[1], '@') === false) {
+                $sMethod = $aMatch[1];
+                $sPart = $aMatch[2];
             }
-            return array($aMatch[1], $aParts);
+            else {
+                $aTemp = explode('@', $aMatch[2]);
+                if($aTemp[1] == $this->aConfig['BOT_NAME']) {
+                    $sMethod = $aTemp[0];
+                    $sPart = $aMatch[2];
+                }
+                else {
+                    $sMethod = null;
+                    $sPart = $aMatch[0];
+                }
+            }
+
+            if(!empty($sPart)) {
+                $aParts[] = $sPart;
+            }
+            return array($sMethod, $aParts);
         }
         else {
             return array(null, array($sMessage));
