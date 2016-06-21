@@ -79,6 +79,3 @@ class GenSavBot extends HTMLtoImageBot {
         }
     }
 }
-
-$oBot = new GenSavBot('1972rty4297hgf9_23ug42386t_20gh86');
-$oBot->parse('{"message":{"text":"/help@GenSavBot","chat":{"id":25900594}}}');
