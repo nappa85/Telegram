@@ -41,6 +41,12 @@ abstract class Bot {
         if($this->bUseSessions) {
             session_id(get_called_class().$this->getChatId($aJson));
             session_start();
+
+            //actually the check for already processed messages is available only when using php sessions
+            $sMessageId = $this->getMessageId($aJson);
+            if($_SESSION['processed_messages'][$sMessageId] === true) {
+                return;
+            }
         }
 
         $sText = $this->getMessageText($aJson);
@@ -57,11 +63,17 @@ abstract class Bot {
         }
 
         if(!empty($sMethod) && method_exists($this, $sMethod)) {
-            return call_user_func_array(array(&$this, $sMethod), array_merge(array($aJson), $aParts));
+            $aRes = call_user_func_array(array(&$this, $sMethod), array_merge(array($aJson), $aParts));
         }
         else {
-            return $this->logMessage($sJson);
+            $aRes = $this->logMessage($sJson);
         }
+
+        if($this->bUseSessions) {
+            $_SESSION['processed_messages'][$sMessageId] = true;
+        }
+
+        return $aRes;
     }
 
     /**
