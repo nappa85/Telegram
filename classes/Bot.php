@@ -138,7 +138,7 @@ abstract class Bot {
                 $sPart = $aMatch[2];
             }
             else {
-                $aTemp = explode('@', $aMatch[2]);
+                $aTemp = explode('@', $aMatch[1]);
                 if($aTemp[1] == $this->aConfig['BOT_NAME']) {
                     $sMethod = $aTemp[0];
                     $sPart = $aMatch[2];
