@@ -6,24 +6,6 @@ require_once('HTMLtoImageBot.php');
  * GenSav Bot class
  */
 class GenSavBot extends HTMLtoImageBot {
-    protected $aKeywords = array(
-        'zingar',
-        'negr',
-        'rom',
-        'rusp',
-        'immigrat',
-        'clandestin',
-        'arab',
-        'cines',
-        'rumen',
-        'slav',
-        'razzist',
-        'barcon',
-        'drog',
-        'stupr',
-        'ladr',
-        'padani',
-    );
     protected $sUrl = 'http://gensav.altervista.org/';
 
     protected function about($aJson) {
@@ -39,8 +21,16 @@ class GenSavBot extends HTMLtoImageBot {
     }
 
     protected function catchAll($aJson, $sText) {
-        if(preg_match('/('.implode('|', $this->aKeywords).')/i', $sText)) {
+        if(preg_match('/('.implode('|', $this->aConfig['keywords']).')/i', $sText)) {
             $sChatId = $this->getChatId($aJson);
+
+            //50% probability to send audio
+            if(rand(0, 1)) {
+                $this->sendChatAction($sChatId, 'record_audio');
+
+                $aMedias = $this->getMediaList('*.ogg');
+                return $this->sendVoice($sChatId, $this->getMedia($aMedias[rand(0, count($aMedias) - 1)]));
+            }
 
             $this->sendChatAction($sChatId, 'upload_photo');
 

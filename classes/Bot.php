@@ -635,10 +635,39 @@ abstract class Bot {
         return $aRes;
     }
 
+    /**
+     * Sends a command to the Telegram server
+     * @param   $method     string  the chat's id
+     * @param   $arguments  string  the message
+     * @returns array
+     */
+    protected function getMediaList($sFilter = '*') {
+        $aFiles = glob(__DIR__.'/../media/'.get_called_class().'/'.$sFilter);
+
+        $aRes = array();
+        foreach($aFiles as $sFile) {
+            $aRes[] = $sFile;
+        }
+
+        return $aRes;
+    }
+
+    /**
+     * Sends a command to the Telegram server
+     * @param   $method     string  the chat's id
+     * @param   $arguments  string  the message
+     * @returns array
+     */
     protected function getMedia($sFilename) {
         return __DIR__.'/../media/'.get_called_class().'/'.$sFilename;
     }
 
+    /**
+     * Sends a suggestion to the Bot developer
+     * @param   $json       Array   the message received
+     * @param   $suggestion string  the suggestion
+     * @returns array
+     */
     protected function suggest($aJson, $sSuggestion) {
         if(empty($sSuggestion)) {
             $this->storeMessage($aJson);
@@ -651,7 +680,17 @@ abstract class Bot {
         return $this->sendMessage($this->getChatId($aJson), 'Thank you for your suggestion.');
     }
 
+    /**
+     * Describes the Bot
+     * @param   $json       Array   the message received
+     * @returns array
+     */
     abstract protected function about($aJson);
 
+    /**
+     * Shows the usage message
+     * @param   $json       Array   the message received
+     * @returns array
+     */
     abstract protected function help($aJson);
 }
