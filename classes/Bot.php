@@ -646,7 +646,7 @@ abstract class Bot {
 
         $aRes = array();
         foreach($aFiles as $sFile) {
-            $aRes[] = $sFile;
+            $aRes[] = basename($sFile);
         }
 
         return $aRes;
