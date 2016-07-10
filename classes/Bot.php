@@ -674,7 +674,7 @@ abstract class Bot {
             return $this->storeMessage($this->sendMessage($this->getChatId($aJson), 'Now insert the suggestion text', $this->getMessageId($aJson), true));
         }
 
-        $this->sendMessage($this->aConfig['DEVELOPER_CHAT_ID'], 'New suggestion received from '.(empty($aJson['message']['from']['username'])?$aJson['message']['from']['first_name'].' '.$aJson['message']['from']['last_name'].' ('.$aJson['message']['from']['id'].')':'@'.$aJson['message']['from']['username']).': '.$sSuggestion);
+        $this->sendMessage($this->aConfig['DEVELOPER_CHAT_ID'], 'New suggestion received from @'.(empty($aJson['message']['from']['username'])?$aJson['message']['from']['id'].'('.$aJson['message']['from']['first_name'].' '.$aJson['message']['from']['last_name'].')':$aJson['message']['from']['username']).': '.$sSuggestion);
         $this->recursivelyDeleteMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
 
         return $this->sendMessage($this->getChatId($aJson), 'Thank you for your suggestion.');
