@@ -6,6 +6,12 @@
  * Base Bot class
  */
 abstract class Bot {
+	/**
+	 * Telegram message max lenght
+	 * @type int
+	 */
+	protected const MAX_LENGTH = 4096;
+
 	/*
 	 * Bot's configuration
 	 * @type array
@@ -343,7 +349,31 @@ abstract class Bot {
 			$aParams['reply_markup'] = json_encode($aKeyboard);
 		}
 
-		return $this->callTelegram('sendMessage', $aParams);
+		//the message is too long, we need to split it
+		if(strlen($sMessage) > self::MAX_LENGTH) {
+			$aMessage = explode("\n", $sMessage);
+			$aMessages = array();
+			$iIndex = 0;
+			foreach($aMessage as $sText) {
+				if(strlen($sText) > self::MAX_LENGTH) {
+					throw new Exception('Message too long');
+				}
+				if(strlen($aMessages[$iIndex].(empty($aMessages[$iIndex])?'':"\n").$sText) > self::MAX_LENGTH) {
+					$iIndex++;
+				}
+				$aMessages[$iIndex] .= (empty($aMessages[$iIndex])?'':"\n").$sText;
+			}
+
+			$aResults = array();
+			foreach($aMessages as $sMessage) {
+				$aParams['text'] = $sMessage;
+				$aResults[] = $this->callTelegram('sendMessage', $aParams);
+			}
+			return $aResults;
+		}
+		else {
+			return $this->callTelegram('sendMessage', $aParams);
+		}
 	}
 
 	/**

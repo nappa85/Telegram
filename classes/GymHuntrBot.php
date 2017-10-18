@@ -14,7 +14,7 @@ class GymHuntrBot extends Bot {
 	}
 
 	protected function help($aJson) {
-		return $this->sendMessage($this->getChatId($aJson), "/start - to start the bot\n\n/listraid - Lists all RAID in the area\n\n/searchraid - Search for a given raid boss on the area\n\n/searchperson - Search for a given nickname on the area\n\n/suggest - Suggest an improvement to the developer\nYou can pass an inline argument, or call the command and insert the subject when asked.\nFor example:\n/suggest I have an idea for an improvement!", null, false, true, null, $this->getKeyboard());
+		return $this->sendMessage($this->getChatId($aJson), "/start - to start the bot\n\n/listraid - Lists all RAID in the area\n\n/searchraid - Search for a given raid boss on the area\n\n/listgyms - Lists all Gyms in the area\n\n/searchperson - Search for a given nickname on the area\n\n/suggest - Suggest an improvement to the developer\nYou can pass an inline argument, or call the command and insert the subject when asked.\nFor example:\n/suggest I have an idea for an improvement!", null, false, true, null, $this->getKeyboard());
 	}
 
 	protected function start($aJson) {
@@ -40,6 +40,9 @@ class GymHuntrBot extends Bot {
 			case 'Search RAID':
 				$aJson['message']['text'] = '/searchraid';//history can't call catchAll workaround 
 				return $this->searchraid($aJson);
+			case 'List Gyms':
+				$aJson['message']['text'] = '/listgyms';//history can't call catchAll workaround 
+				return $this->listgyms($aJson);
 			case 'Search Person':
 				$aJson['message']['text'] = '/searchperson';//history can't call catchAll workaround 
 				return $this->searchperson($aJson);
@@ -135,6 +138,37 @@ class GymHuntrBot extends Bot {
 		return $this->recursivelyDeleteMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
 	}
 
+	protected function listgyms($aJson) {
+		$this->sendChatAction($this->getChatId($aJson), 'typing');
+
+		if(empty($_SESSION['location'])) {
+			return $this->sendMessage($this->getChatId($aJson), 'Please first send your location', null, false, true, null, $this->getKeyboard());
+		}
+
+		$aGyms = $this->_getGyms($_SESSION['location']['latitude'], $_SESSION['location']['longitude']);
+
+		if($aGyms === false) {
+			return $this->sendMessage($this->getChatId($aJson), 'Something went wrong, please retry', null, false, true, null, $this->getKeyboard());
+		}
+		if(empty($aGyms['gyms'])) {
+			return $this->sendMessage($this->getChatId($aJson), 'No Gyms on your area', null, false, true, null, $this->getKeyboard());
+		}
+
+		if(($aGyms['update']['response'] == 'failed') && ($aGyms['update']['responseMsg'] != 'This area has been scanned recently, try again later.')) {
+			$this->sendMessage($this->getChatId($aJson), 'Unable to update, using cached data.');
+		}
+
+		$aFoundGyms = array();
+		foreach($aGyms['gyms'] as $sGym) {
+			$aGym = json_decode($sGym, true);
+			if($aGym) {
+				$aFoundGyms[] = '['.$aGym['gym_name'].'](http://www.google.com/maps/place/'.$aGym['longitude'].','.$aGym['latitude'].') owned by '.$this->_getTeamIcon($aGym['team_id']).' prestige '.$aGym['gym_points'];
+			}
+		}
+
+		return $this->sendMessage($this->getChatId($aJson), "Current Gyms in your area:\n".implode("\n", $aFoundGyms), null, false, true, 'Markdown', $this->getKeyboard());
+	}
+
 	protected function searchperson($aJson, $sNickName = null) {
 		$this->sendChatAction($this->getChatId($aJson), 'typing');
 
@@ -194,6 +228,11 @@ class GymHuntrBot extends Bot {
 					),
 					array(
 						'text' => 'Search RAID'
+					)
+				),
+				array(
+					array(
+						'text' => 'List Gyms'
 					),
 					array(
 						'text' => 'Search Person'
@@ -204,7 +243,20 @@ class GymHuntrBot extends Bot {
 		);
 	}
 
-	function _getProxy() {
+	protected function _getTeamIcon($iTeamId) {
+		switch($iTeamId) {
+			case 1:
+				return "\xE2\x9D\x84";//blue
+			case 2:
+				return "\xE2\x9D\xA4";//red
+			case 3:
+				return "\xE2\x9A\xA1";//yellow
+			default:
+				return "\xE2\x9A\xAA";//empty
+		}
+	}
+
+	protected function _getProxy() {
 		static $sProxy = null;
 
 		if(is_null($sProxy)) {
