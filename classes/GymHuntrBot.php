@@ -72,7 +72,7 @@ class GymHuntrBot extends Bot {
 		foreach($aGyms['raids'] as $sRaid) {
 			$aRaid = json_decode($sRaid, true);
 			if($aRaid) {
-				$aFoundRaids[] = (empty($aRaid['raid_boss_id'])?"\xF0\x9F\x8D\xB3":$this->aConfig['pokemon'][$aRaid['raid_boss_id']]).' '.implode('', array_fill(0, $aRaid['raid_level'], "\xE2\xAD\x90")).' from '.date('Y-m-d H:i:s', $aRaid['raid_battle_ms'] / 1000).' UTC to '.date('Y-m-d H:i:s', $aRaid['raid_end_ms'] / 1000).' UTC at '.$this->_findGym($aRaid['gym_id'], $aGyms['gyms']);
+				$aFoundRaids[] = (empty($aRaid['raid_boss_id'])?"\xF0\x9F\x8D\xB3":$this->aConfig['pokemon'][$aRaid['raid_boss_id']]).' '.implode('', array_fill(0, $aRaid['raid_level'], "\xE2\xAD\x90")).' from '.$this->_formatTimestamp($aRaid['raid_battle_ms'] / 1000).' to '.$this->_formatTimestamp($aRaid['raid_end_ms'] / 1000).' at '.$this->_findGym($aRaid['gym_id'], $aGyms['gyms']);
 			}
 		}
 
@@ -125,7 +125,7 @@ class GymHuntrBot extends Bot {
 		foreach($aFiltered as $sRaid) {
 			$aRaid = json_decode($sRaid, true);
 			if($aRaid) {
-				$aFoundRaids[] = 'from '.date('Y-m-d H:i:s', $aRaid['raid_battle_ms'] / 1000).' UTC to '.date('Y-m-d H:i:s', $aRaid['raid_end_ms'] / 1000).' UTC at '.$this->_findGym($aRaid['gym_id'], $aGyms['gyms']);
+				$aFoundRaids[] = 'from '.$this->_formatTimestamp($aRaid['raid_battle_ms'] / 1000).' to '.$this->_formatTimestamp($aRaid['raid_end_ms'] / 1000).' at '.$this->_findGym($aRaid['gym_id'], $aGyms['gyms']);
 			}
 		}
 
@@ -411,5 +411,67 @@ class GymHuntrBot extends Bot {
 			$aGym = json_decode(current($aFiltered), true);
 			return '['.$aGym['gym_name'].'](http://www.google.com/maps/place/'.$aGym['longitude'].','.$aGym['latitude'].')';
 		}
+	}
+
+	protected function _formatTimestamp($iTimestamp) {
+		$oDateTime = new DateTime('@'.intval($iTimestamp));
+		$oDateTime->setTimezone(static::_get_nearest_timezone($_SESSION['location']['latitude'], $_SESSION['location']['longitude'], static::_getCountryCode($_SESSION['location']['latitude'], $_SESSION['location']['longitude'])));
+		return $oDateTime->format('Y-m-d H:i:s');
+	}
+
+	public static function _getCountryCode($fLatitude, $fLongitude) {
+		$aResults = json_decode(file_get_contents('https://maps.googleapis.com/maps/api/geocode/json?latlng='.$fLatitude.','.$fLongitude.'&sensor=false'), true);
+
+		if(is_array($aResults)) {
+			foreach($aResults['results'] as $aResult) {
+				foreach($aResult['address_components'] as $aComponent) {
+					if(($aComponent['types'][0] == 'country') && ($aComponent['types'][0] == 'political')) {
+						return $aComponent['short_name'];
+					}
+				}
+			}
+		}
+
+		return null;
+	}
+
+	//from https://stackoverflow.com/questions/3126878/get-php-timezone-name-from-latitude-and-longitude?noredirect=1&lq=1
+	public static function _get_nearest_timezone($cur_lat, $cur_long, $country_code = '') {
+		$timezone_ids = ($country_code) ? DateTimeZone::listIdentifiers(DateTimeZone::PER_COUNTRY, $country_code)
+										: DateTimeZone::listIdentifiers();
+
+		$time_zone = null;
+		if($timezone_ids && is_array($timezone_ids) && isset($timezone_ids[0])) {
+
+			$tz_distance = 0;
+
+			//only one identifier?
+			if (count($timezone_ids) == 1) {
+				$time_zone = new DateTimeZone($timezone_ids[0]);
+			} else {
+
+				foreach($timezone_ids as $timezone_id) {
+					$timezone = new DateTimeZone($timezone_id);
+					$location = $timezone->getLocation();
+					$tz_lat   = $location['latitude'];
+					$tz_long  = $location['longitude'];
+
+					$theta    = $cur_long - $tz_long;
+					$distance = (sin(deg2rad($cur_lat)) * sin(deg2rad($tz_lat))) 
+					+ (cos(deg2rad($cur_lat)) * cos(deg2rad($tz_lat)) * cos(deg2rad($theta)));
+					$distance = acos($distance);
+					$distance = abs(rad2deg($distance));
+					// echo '<br />'.$timezone_id.' '.$distance; 
+
+					if (!$time_zone || $tz_distance > $distance) {
+						$time_zone   = $timezone;
+						$tz_distance = $distance;
+					} 
+
+				}
+			}
+		}
+
+		return $time_zone;
 	}
 }
