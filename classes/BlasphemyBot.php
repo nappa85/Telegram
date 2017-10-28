@@ -1,6 +1,6 @@
 <?php
 
-require_once('Bot.php');
+require_once(__DIR__.'/Bot.php');
 
 /**
 * Swearing Bot class
@@ -34,7 +34,7 @@ class BlasphemyBot extends Bot {
 		}
 		else {
 			$this->sendMessage($this->getChatId($aJson), $this->getRandomWordA().$sSubject.$this->getRandomWordC());
-			return $this->recursivelyDeleteMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
+			return $this->recursivelyDeleteStoredMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
 		}
 	}
 

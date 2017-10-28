@@ -1,6 +1,6 @@
 <?php
 
-require_once('HTMLtoImageBot.php');
+require_once(__DIR__.'/HTMLtoImageBot.php');
 
 /**
 * GenSav Bot class

@@ -1,6 +1,6 @@
 <?php
 
-//include_once('FileSessionHandler.php');
+require_once(__DIR__.'/Session.php');
 
 /**
  * Base Bot class
@@ -17,12 +17,6 @@ abstract class Bot {
 	 * @type array
 	 */
 	protected $aConfig;
-
-	/*
-	 * Config flag to switch between php sessions and files storage
-	 * @type bool
-	 */
-	protected $bUseSessions = true;
 
 	/**
 	 * Checks if the received tocken matches with the Bot secret tocken
@@ -44,15 +38,11 @@ abstract class Bot {
 		$sMethod = null;
 		$aJson = json_decode($sJson, true);
 
-		if($this->bUseSessions) {
-			session_id(get_called_class().$this->getChatId($aJson));
-			session_start();
+		$oSession = Session::getSingleton(get_called_class(), $this->getChatId($aJson));
 
-			//actually the check for already processed messages is available only when using php sessions
-			$sMessageId = $this->getMessageId($aJson);
-			if($_SESSION['processed_messages'][$sMessageId] === true) {
-				return;
-			}
+		$sMessageId = $this->getMessageId($aJson);
+		if($oSession->isAlreadyProcessed($sMessageId)) {
+			return;
 		}
 
 		$sText = $this->getMessageText($aJson);
@@ -75,9 +65,7 @@ abstract class Bot {
 			$aRes = $this->logMessage($sJson);
 		}
 
-		if($this->bUseSessions) {
-			$_SESSION['processed_messages'][$sMessageId] = true;
-		}
+		$oSession->setAsProcessed($sMessageId);
 
 		return $aRes;
 	}
@@ -184,12 +172,8 @@ abstract class Bot {
 	 * @returns bool
 	 */
 	protected function storedMessage($sChatId, $sMessageId) {
-		if($this->bUseSessions) {
-			return array_key_exists('m'.$sMessageId, $_SESSION);
-		}
-		else {
-			return file_exists(__DIR__.'/../stored_messages/'.$sChatId.'/'.$sMessageId.'.json');
-		}
+		$oSession = Session::getSingleton();
+		return $oSession->storedMessage($sChatId, $sMessageId);
 	}
 
 	/**
@@ -197,18 +181,8 @@ abstract class Bot {
 	 * @param   $json   string  the message structure
 	 */
 	protected function storeMessage($aJson) {
-		if($this->bUseSessions) {
-			$_SESSION['m'.$this->getMessageId($aJson)] = $aJson;
-			return true;
-		}
-		else {
-			$sDir = __DIR__.'/../stored_messages/'.$this->getChatId($aJson);
-			if(!file_exists($sDir)) {
-				mkdir($sDir, 0777, true);
-			}
-
-			return file_put_contents($sDir.'/'.$this->getMessageId($aJson).'.json', json_encode($aJson));
-		}
+		$oSession = Session::getSingleton();
+		return $oSession->storeMessage($this->getChatId($aJson), $this->getMessageId($aJson), $aJson);
 	}
 
 	/**
@@ -218,10 +192,11 @@ abstract class Bot {
 	 * @returns array
 	 */
 	protected function recursivelyGetMethodAndArguments($sChatId, $sMessageId, $aParts = array()) {
+		$oSession = Session::getSingleton();
 		$sMethod = null;
 
-		while($this->storedMessage($sChatId, $sMessageId)) {
-			$aJson = $this->retrieveMessage($sChatId, $sMessageId);
+		while($oSession->storedMessage($sChatId, $sMessageId)) {
+			$aJson = $oSession->retrieveStoredMessage($sChatId, $sMessageId);
 
 			if(!$this->isResult($aJson)) {
 				list($sMethod, $aNewParts) = $this->getMethodAndArguments($this->getMessageText($aJson));
@@ -240,13 +215,9 @@ abstract class Bot {
 	 * @param   $message_id string  the message's id
 	 * @returns array
 	 */
-	protected function retrieveMessage($sChatId, $sMessageId) {
-		if($this->bUseSessions) {
-			return $_SESSION['m'.$sMessageId];
-		}
-		else {
-			return json_decode(file_get_contents(__DIR__.'/../stored_messages/'.$sChatId.'/'.$sMessageId.'.json'), true);
-		}
+	protected function retrieveStoredMessage($sChatId, $sMessageId) {
+		$oSession = Session::getSingleton();
+		return $oSession->retrieveStoredMessage($sChatId, $sMessageId);
 	}
 
 	/**
@@ -255,11 +226,13 @@ abstract class Bot {
 	 * @param   $message_id string  the message's id
 	 * @returns bool
 	 */
-	protected function recursivelyDeleteMessage($sChatId, $sMessageId) {
-		while($this->storedMessage($sChatId, $sMessageId)) {
-			$aJson = $this->retrieveMessage($sChatId, $sMessageId);
+	protected function recursivelyDeleteStoredMessage($sChatId, $sMessageId) {
+		$oSession = Session::getSingleton();
 
-			if(!$this->deleteMessage($sChatId, $sMessageId)) {
+		while($oSession->storedMessage($sChatId, $sMessageId)) {
+			$aJson = $oSession->retrieveStoredMessage($sChatId, $sMessageId);
+
+			if(!$oSession->deleteStoredMessage($sChatId, $sMessageId)) {
 				return false;
 			}
 
@@ -275,14 +248,9 @@ abstract class Bot {
 	 * @param   $message_id string  the message's id
 	 * @returns bool
 	 */
-	protected function deleteMessage($sChatId, $sMessageId) {
-		if($this->bUseSessions) {
-			unset($_SESSION['m'.$sMessageId]);
-			return true;
-		}
-		else {
-			return unlink(__DIR__.'/../stored_messages/'.$sChatId.'/'.$sMessageId.'.json');
-		}
+	protected function deleteStoredMessage($sChatId, $sMessageId) {
+		$oSession = Session::getSingleton();
+		return $oSession->deleteStoredMessage($sChatId, $sMessageId);
 	}
 
 	/**
@@ -374,6 +342,13 @@ abstract class Bot {
 		else {
 			return $this->callTelegram('sendMessage', $aParams);
 		}
+	}
+
+	protected function deleteMessage($sChatId, $sMessageId) {
+		return $this->callTelegram('deleteMessage', array(
+			'chat_id' => $sChatId,
+			'message_id' => $sMessageId
+		));
 	}
 
 	/**
@@ -684,9 +659,15 @@ abstract class Bot {
 		}
 
 		$this->sendMessage($this->aConfig['DEVELOPER_CHAT_ID'], 'New suggestion received from ['.$aJson['message']['from']['first_name'].' '.$aJson['message']['from']['last_name'].'](tg://user?id='.$aJson['message']['from']['id'].'): '.$sSuggestion, null, false, true, 'Markdown');
-		$this->recursivelyDeleteMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
+		$this->recursivelyDeleteStoredMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
 
 		return $this->sendMessage($this->getChatId($aJson), 'Thank you for your suggestion.');
+	}
+
+	/**
+	 * Perform optionals scheduled operations
+	 */
+	protected function cron() {
 	}
 
 	/**

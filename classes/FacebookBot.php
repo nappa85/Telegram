@@ -1,6 +1,6 @@
 <?php
 
-require_once('Bot.php');
+require_once(__DIR__.'/Bot.php');
 
 /**
 * Facebook Bot class
@@ -18,21 +18,27 @@ abstract class FacebookBot extends Bot {
 	}
 
 	protected function _getCookies($sResponse) {
-		if(empty($_SESSION['cookies'])) {
-			$_SESSION['cookies'] = array();
+		$oSession = Session::getSingleton();
+		if($oSession->storedValue('cookies')) {
+			$aCookies = $oSession->retrieveValue('cookies');
+		}
+		else {
+			$aCookies = array();
 		}
 
 		if(preg_match_all('/Set\-Cookie\:\s+([^\=]+)=([^\;]+)/', $sResponse, $aMatches, PREG_SET_ORDER)) {
 			foreach($aMatches as $aMatch) {
-				$_SESSION['cookies'][$aMatch[1]] = $aMatch[2];
+				$aCookies[$aMatch[1]] = $aMatch[2];
 			}
 		}
+		$oSession->storeValue('cookies', $aCookies);
 
-		$aCookies = array();
-		foreach($_SESSION['cookies'] as $sKey => $sValue) {
-			$aCookies[] = $sKey.'='.$sValue;
+		$aResult = array();
+		foreach($aCookies as $sKey => $sValue) {
+			$aResult[] = $sKey.'='.$sValue;
 		}
-		return implode('; ', $aCookies);
+
+		return implode('; ', $aResult);
 	}
 
 	protected function _getContent($sChatId, $sUrl, $sCookies, $iBack = 0, $iYear = 0) {
@@ -192,18 +198,19 @@ abstract class FacebookBot extends Bot {
 	}
 
 	public function get($aJson = null) {
+		$oSession = Session::getSingleton();
 		$sChatId = $this->getChatId($aJson);
 
 		$aRes = array();
 		$iCount = 10;
 		while((count($aRes) == 0) && ($iCount > 0)) {
-			if(empty($_SESSION['cookies'])) {
+			if(!$oSession->storedValue('cookies')) {
 				$this->_login($sChatId);
 			}
 
 			$aRes = $this->_getContent($sChatId, $this->aConfig['params']['profile'], $this->_getCookies($sResponse), rand(0, 10), rand(0, 10));
 			if($aRes === false) {
-				$_SESSION['cookies'] = array();
+				$oSession->deleteValue('cookies');
 			}
 
 			$iCount--;

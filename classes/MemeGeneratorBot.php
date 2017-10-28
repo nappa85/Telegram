@@ -1,6 +1,6 @@
 <?php
 
-require_once('Bot.php');
+require_once(__DIR__.'/Bot.php');
 
 /**
 * Meme Generator Bot class
@@ -189,6 +189,6 @@ class MemeGeneratorBot extends Bot {
 			$this->sendMessage($this->getChatId($aJson), empty($aResponse['error_message'])?$aResponse['description']:$aResponse['error_message']);
 		}
 
-		return $this->recursivelyDeleteMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
+		return $this->recursivelyDeleteStoredMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
 	}
 }

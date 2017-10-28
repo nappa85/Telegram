@@ -1,6 +1,6 @@
 <?php
 
-require_once('Bot.php');
+require_once(__DIR__.'/Bot.php');
 
 /**
 * SuperGugeBot class

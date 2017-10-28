@@ -1,6 +1,6 @@
 <?php
 
-require_once('Bot.php');
+require_once(__DIR__.'/Bot.php');
 
 /**
  * GymHuntr Bot class
@@ -18,19 +18,22 @@ class GymHuntrBot extends Bot {
 	}
 
 	protected function start($aJson) {
+		//$this->suggest($aJson, 'Bot started on chat '.json_encode($aJson['message']['chat']));//debug
 		return $this->sendMessage($this->getChatId($aJson), "Welcome to GymHuntrBot!", null, false, true, null, $this->getKeyboard());
 	}
 
 	protected function catchAll($aJson, $sText) {
 		if($aJson['message']['location']) {
-			$this->sendChatAction($this->getChatId($aJson), 'typing');
+			$sChatId = $this->getChatId($aJson);
+			$this->sendChatAction($sChaId, 'typing');
 
-			$_SESSION['location'] = $aJson['message']['location'];
+			$oSession = Session::getSingleton();
+			$oSession->storeValue($sChatId, 'location', $aJson['message']['location']);
 
 			//launch a scan ignoring the result
-			$this->_getGyms($_SESSION['location']['latitude'], $_SESSION['location']['longitude']);
+			$this->_getGyms($aJson['message']['location']['latitude'], $aJson['message']['location']['longitude']);
 
-			return $this->sendMessage($this->getChatId($aJson), 'Location acquired', null, false, true, null, $this->getKeyboard());
+			return $this->sendMessage($sChatId, 'Location acquired', null, false, true, null, $this->getKeyboard());
 		}
 
 		switch($sText) {
@@ -50,45 +53,42 @@ class GymHuntrBot extends Bot {
 	}
 
 	protected function listraid($aJson) {
-		$this->sendChatAction($this->getChatId($aJson), 'typing');
+		$sChatId = $this->getChatId($aJson);
+		$this->sendChatAction($sChatId, 'typing');
 
-		if(empty($_SESSION['location'])) {
-			return $this->sendMessage($this->getChatId($aJson), 'Please first send your location', null, false, true, null, $this->getKeyboard());
+		$oSession = Session::getSingleton();
+		if(!$oSession->storedValue($sChatId, 'location')) {
+			return $this->sendMessage($sChatId, 'Please first send your location', null, false, true, null, $this->getKeyboard());
 		}
 
-		$aGyms = $this->_getGyms($_SESSION['location']['latitude'], $_SESSION['location']['longitude']);
+		$aLocation = $oSession->retrieveValue($sChatId, 'location');
+		$aGyms = $this->_getGyms($aLocation['latitude'], $aLocation['longitude']);
 		if($aGyms === false) {
-			return $this->sendMessage($this->getChatId($aJson), 'Something went wrong, please retry', null, false, true, null, $this->getKeyboard());
+			return $this->sendMessage($sChatId, 'Something went wrong, please retry', null, false, true, null, $this->getKeyboard());
 		}
 		if(empty($aGyms['raids'])) {
-			return $this->sendMessage($this->getChatId($aJson), 'No RAIDs on your area', null, false, true, null, $this->getKeyboard());
+			return $this->sendMessage($sChatId, 'No RAIDs on your area', null, false, true, null, $this->getKeyboard());
 		}
 
 		if(($aGyms['update']['response'] == 'failed') && ($aGyms['update']['responseMsg'] != 'This area has been scanned recently, try again later.')) {
-			$this->sendMessage($this->getChatId($aJson), 'Unable to update, using cached data.');
+			$this->sendMessage($sChatId, 'Unable to update, using cached data.');
 		}
 
-		$aFoundRaids = array();
-		foreach($aGyms['raids'] as $sRaid) {
-			$aRaid = json_decode($sRaid, true);
-			if($aRaid) {
-				$aFoundRaids[] = (empty($aRaid['raid_boss_id'])?"\xF0\x9F\x8D\xB3":$this->aConfig['pokemon'][$aRaid['raid_boss_id']]).' '.implode('', array_fill(0, $aRaid['raid_level'], "\xE2\xAD\x90")).' from '.$this->_formatTimestamp($aRaid['raid_battle_ms'] / 1000).' to '.$this->_formatTimestamp($aRaid['raid_end_ms'] / 1000).' at '.$this->_findGym($aRaid['gym_id'], $aGyms['gyms']);
-			}
-		}
-
-		return $this->sendMessage($this->getChatId($aJson), "Current RAIDs in your area:\n".implode("\n", $aFoundRaids), null, false, true, 'Markdown', $this->getKeyboard());
+		return $this->_formatRaids($sChatId, $aGyms, 'Current RAIDs in your area');
 	}
 
 	protected function searchraid($aJson, $sRaidBoss = null) {
-		$this->sendChatAction($this->getChatId($aJson), 'typing');
+		$sChatId = $this->getChatId($aJson);
+		$this->sendChatAction($sChatId, 'typing');
 
-		if(empty($_SESSION['location'])) {
-			return $this->sendMessage($this->getChatId($aJson), 'Please first send your location', null, false, true, null, $this->getKeyboard());
+		$oSession = Session::getSingleton();
+		if(!$oSession->storedValue($sChatId, 'location')) {
+			return $this->sendMessage($sChatId, 'Please first send your location', null, false, true, null, $this->getKeyboard());
 		}
 
 		if(empty($sRaidBoss)) {
 			$this->storeMessage($aJson);
-			return $this->storeMessage($this->sendMessage($this->getChatId($aJson), 'Now insert a RAID boss to search for', $this->getMessageId($aJson), true));
+			return $this->storeMessage($this->sendMessage($sChatId, 'Now insert a RAID boss to search for', $this->getMessageId($aJson), true));
 		}
 		else {
 			$iRaidBossId = null;
@@ -102,22 +102,23 @@ class GymHuntrBot extends Bot {
 
 			if(is_null($iRaidBossId)) {
 				$this->storeMessage($aJson);
-				return $this->storeMessage($this->sendMessage($this->getChatId($aJson), 'Can\'t find a Pokemon named '.$sRaidBoss, $this->getMessageId($aJson), true));
+				return $this->storeMessage($this->sendMessage($sChatId, 'Can\'t find a Pokemon named '.$sRaidBoss, $this->getMessageId($aJson), true));
 			}
 		}
 
-		$aGyms = $this->_getGyms($_SESSION['location']['latitude'], $_SESSION['location']['longitude']);
+		$aLocation = $oSession->retrieveValue($sChatId, 'location');
+		$aGyms = $this->_getGyms($aLocation['latitude'], $aLocation['longitude']);
 		if($aGyms === false) {
-			$this->sendMessage($this->getChatId($aJson), 'Something went wrong, please retry', null, false, true, null, $this->getKeyboard());
-			return $this->recursivelyDeleteMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
+			$this->sendMessage($sChatId, 'Something went wrong, please retry', null, false, true, null, $this->getKeyboard());
+			return $this->recursivelyDeleteStoredMessage($sChatId, $this->getReplyToMessageId($aJson));
 		}
 		if(empty($aGyms['raids'])) {
-			$this->sendMessage($this->getChatId($aJson), 'No RAIDs on your area', null, false, true, null, $this->getKeyboard());
-			return $this->recursivelyDeleteMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
+			$this->sendMessage($sChatId, 'No RAIDs on your area', null, false, true, null, $this->getKeyboard());
+			return $this->recursivelyDeleteStoredMessage($sChatId, $this->getReplyToMessageId($aJson));
 		}
 
 		if(($aGyms['update']['response'] == 'failed') && ($aGyms['update']['responseMsg'] != 'This area has been scanned recently, try again later.')) {
-			$this->sendMessage($this->getChatId($aJson), 'Unable to update, using cached data.');
+			$this->sendMessage($sChatId, 'Unable to update, using cached data.');
 		}
 
 		$aFiltered = array_filter($aGyms['raids'], function($sRaid) use ($iRaidBossId) { return preg_match('/\"raid_boss_id"\:'.$iRaidBossId.'\,/i', $sRaid); });
@@ -125,37 +126,40 @@ class GymHuntrBot extends Bot {
 		foreach($aFiltered as $sRaid) {
 			$aRaid = json_decode($sRaid, true);
 			if($aRaid) {
-				$aFoundRaids[] = 'from '.$this->_formatTimestamp($aRaid['raid_battle_ms'] / 1000).' to '.$this->_formatTimestamp($aRaid['raid_end_ms'] / 1000).' at '.$this->_findGym($aRaid['gym_id'], $aGyms['gyms']);
+				$aFoundRaids[] = 'from '.static::_formatTimestamp($sChatId, $aRaid['raid_battle_ms'] / 1000).' to '.static::_formatTimestamp($sChatId, $aRaid['raid_end_ms'] / 1000).' at '.static::_findGym($aRaid['gym_id'], $aGyms['gyms']);
 			}
 		}
 
 		if(empty($aFoundRaids)) {
-			$this->sendMessage($this->getChatId($aJson), $sRaidBoss.' not found on your area RAIDs', null, false, true, null, $this->getKeyboard());
+			$this->sendMessage($sChatId, $sRaidBoss.' not found on your area RAIDs', null, false, true, null, $this->getKeyboard());
 		}
 		else {
-			$this->sendMessage($this->getChatId($aJson), $sRaidBoss." found on those gyms:\n".implode("\n", $aFoundRaids), null, false, true, 'Markdown', $this->getKeyboard());
+			$this->sendMessage($sChatId, $sRaidBoss." found on those gyms:\n".implode("\n", $aFoundRaids), null, false, true, 'Markdown', $this->getKeyboard());
 		}
-		return $this->recursivelyDeleteMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
+		return $this->recursivelyDeleteStoredMessage($sChatId, $this->getReplyToMessageId($aJson));
 	}
 
 	protected function listgyms($aJson) {
-		$this->sendChatAction($this->getChatId($aJson), 'typing');
+		$sChatId = $this->getChatId($aJson);
+		$this->sendChatAction($sChatId, 'typing');
 
-		if(empty($_SESSION['location'])) {
-			return $this->sendMessage($this->getChatId($aJson), 'Please first send your location', null, false, true, null, $this->getKeyboard());
+		$oSession = Session::getSingleton();
+		if(!$oSession->storedValue($sChatId, 'location')) {
+			return $this->sendMessage($sChatId, 'Please first send your location', null, false, true, null, $this->getKeyboard());
 		}
 
-		$aGyms = $this->_getGyms($_SESSION['location']['latitude'], $_SESSION['location']['longitude']);
+		$aLocation = $oSession->retrieveValue($sChatId, 'location');
+		$aGyms = $this->_getGyms($aLocation['latitude'], $aLocation['longitude']);
 
 		if($aGyms === false) {
-			return $this->sendMessage($this->getChatId($aJson), 'Something went wrong, please retry', null, false, true, null, $this->getKeyboard());
+			return $this->sendMessage($sChatId, 'Something went wrong, please retry', null, false, true, null, $this->getKeyboard());
 		}
 		if(empty($aGyms['gyms'])) {
-			return $this->sendMessage($this->getChatId($aJson), 'No Gyms on your area', null, false, true, null, $this->getKeyboard());
+			return $this->sendMessage($sChatId, 'No Gyms on your area', null, false, true, null, $this->getKeyboard());
 		}
 
 		if(($aGyms['update']['response'] == 'failed') && ($aGyms['update']['responseMsg'] != 'This area has been scanned recently, try again later.')) {
-			$this->sendMessage($this->getChatId($aJson), 'Unable to update, using cached data.');
+			$this->sendMessage($sChatId, 'Unable to update, using cached data.');
 		}
 
 		$aFoundGyms = array();
@@ -166,33 +170,36 @@ class GymHuntrBot extends Bot {
 			}
 		}
 
-		return $this->sendMessage($this->getChatId($aJson), "Current Gyms in your area:\n".implode("\n", $aFoundGyms), null, false, true, 'Markdown', $this->getKeyboard());
+		return $this->sendMessage($sChatId, "Current Gyms in your area:\n".implode("\n", $aFoundGyms), null, false, true, 'Markdown', $this->getKeyboard());
 	}
 
 	protected function searchperson($aJson, $sNickName = null) {
-		$this->sendChatAction($this->getChatId($aJson), 'typing');
+		$sChatId = $this->getChatId($aJson);
+		$this->sendChatAction($sChatId, 'typing');
 
-		if(empty($_SESSION['location'])) {
-			return $this->sendMessage($this->getChatId($aJson), 'Please first send your location', null, false, true, null, $this->getKeyboard());
+		$oSession = Session::getSingleton();
+		if(!$oSession->storedValue($sChatId, 'location')) {
+			return $this->sendMessage($sChatId, 'Please first send your location', null, false, true, null, $this->getKeyboard());
 		}
 
 		if(empty($sNickName)) {
 			$this->storeMessage($aJson);
-			return $this->storeMessage($this->sendMessage($this->getChatId($aJson), 'Now insert a nickname to search for', $this->getMessageId($aJson), true));
+			return $this->storeMessage($this->sendMessage($sChatId, 'Now insert a nickname to search for', $this->getMessageId($aJson), true));
 		}
 
-		$aGyms = $this->_getGyms($_SESSION['location']['latitude'], $_SESSION['location']['longitude']);
+		$aLocation = $oSession->retrieveValue($sChatId, 'location');
+		$aGyms = $this->_getGyms($aLocation['latitude'], $aLocation['longitude']);
 		if($aGyms === false) {
-			$this->sendMessage($this->getChatId($aJson), 'Something went wrong, please retry', null, false, true, null, $this->getKeyboard());
-			return $this->recursivelyDeleteMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
+			$this->sendMessage($sChatId, 'Something went wrong, please retry', null, false, true, null, $this->getKeyboard());
+			return $this->recursivelyDeleteStoredMessage($sChatId, $this->getReplyToMessageId($aJson));
 		}
 		if(empty($aGyms['gyms'])) {
-			$this->sendMessage($this->getChatId($aJson), 'No gyms on your area', null, false, true, null, $this->getKeyboard());
-			return $this->recursivelyDeleteMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
+			$this->sendMessage($sChatId, 'No gyms on your area', null, false, true, null, $this->getKeyboard());
+			return $this->recursivelyDeleteStoredMessage($sChatId, $this->getReplyToMessageId($aJson));
 		}
 
 		if(($aGyms['update']['response'] == 'failed') && ($aGyms['update']['responseMsg'] != 'This area has been scanned recently, try again later.')) {
-			$this->sendMessage($this->getChatId($aJson), 'Unable to update, using cached data.');
+			$this->sendMessage($sChatId, 'Unable to update, using cached data.');
 		}
 
 		$aFiltered = array_filter($aGyms['gyms'], function($sGym) use ($sNickName) { return preg_match('/\"trainer_name"\:\"'.preg_quote($sNickName, '/').'\"/i', $sGym); });
@@ -205,12 +212,12 @@ class GymHuntrBot extends Bot {
 		}
 
 		if(empty($aFoundGyms)) {
-			$this->sendMessage($this->getChatId($aJson), $sNickName.' not found on your area', null, false, true, null, $this->getKeyboard());
+			$this->sendMessage($sChatId, $sNickName.' not found on your area', null, false, true, null, $this->getKeyboard());
 		}
 		else {
-			$this->sendMessage($this->getChatId($aJson), $sNickName." found on those gyms:\n".implode("\n", $aFoundGyms), null, false, true, 'Markdown', $this->getKeyboard());
+			$this->sendMessage($sChatId, $sNickName." found on those gyms:\n".implode("\n", $aFoundGyms), null, false, true, 'Markdown', $this->getKeyboard());
 		}
-		return $this->recursivelyDeleteMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
+		return $this->recursivelyDeleteStoredMessage($sChatId, $this->getReplyToMessageId($aJson));
 	}
 
 	protected function getKeyboard() {
@@ -256,24 +263,29 @@ class GymHuntrBot extends Bot {
 		}
 	}
 
-	protected function _getProxy() {
+	protected function _getProxy($bInvalidateProxy = false) {
+		static $aProxies = null;
 		static $sProxy = null;
 
-		if(is_null($sProxy)) {
+		if(is_null($aProxies)) {
 			$sHtml = file_get_contents('http://www.gatherproxy.com/embed/?t=Transparent&p=&c=Italy');
 
 			if(preg_match_all('/gp\.insertPrx\(([^\)]+)\)\;/', $sHtml, $aJSONs)) {
-				$aProxyes = array();
+				$aProxys = array();
 				foreach($aJSONs[1] as $sJSON) {
 					$aProxy = json_decode($sJSON, true);
 					if($aProxy) {
-						$aProxyes[$aProxy['PROXY_IP'].':'.hexdec($aProxy['PROXY_PORT'])] = $aProxy['PROXY_TIME'];
+						$aProxys[$aProxy['PROXY_IP'].':'.hexdec($aProxy['PROXY_PORT'])] = $aProxy['PROXY_TIME'];
 					}
 				}
-				natsort($aProxyes);
+				natsort($aProxys);
 
-				$sProxy = array_keys($aProxyes)[0];
+				$aProxies = array_reverse(array_keys($aProxys));
 			}
+		}
+
+		if(is_null($sProxy) || $bInvalidateProxy) {
+			$sProxy = array_pop($aProxies);
 		}
 
 		return $sProxy;
@@ -287,6 +299,7 @@ class GymHuntrBot extends Bot {
 			CURLOPT_HEADER => $bReturnHeadersAndCookies,
 			CURLOPT_URL => $sUrl,
 			CURLOPT_PROXY => $this->_getProxy(),
+			CURLOPT_TIMEOUT => 10,
 			CURLOPT_HTTPHEADER => array_merge(
 				array(
 					'User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:56.0) Gecko/20100101 Firefox/56.0',
@@ -333,7 +346,7 @@ class GymHuntrBot extends Bot {
 	 * "raids": ["{\"_id\":\"59e6059859c9133b93f72c02\",\"gym_id\":\"e2c050d361324dc69d7c3b9e5d8e9100.16\",\"raid_battle_ms\":1508246900667,\"raid_end_ms\":1508250500667,\"raid_level\":2,\"raid_boss_id\":125,\"raid_boss_cp\":12390}"]
 	 * }
 	 */
-	protected function _getGyms($fLatitude, $fLongitude) {
+	public function _getGyms($fLatitude, $fLongitude, $iRetries = 0) {
 		//call index to obtain __cfduid cookie
 		list($sResponse, $aHeaders, $aCookies) = $this->_callGymHuntr(
 			'https://gymhuntr.com/#'.$fLatitude.','.$fLongitude,
@@ -342,6 +355,15 @@ class GymHuntrBot extends Bot {
 				'Upgrade-Insecure-Requests: 1'
 			)
 		);
+		if(!is_array($aCookies) || !array_key_exists('__cfduid', $aCookies)) {
+			if($iRetries < 5) {
+				$this->_getProxy(true);
+				return $this->_getGyms($fLatitude, $fLongitude, ++$iRetries);
+			}
+			else {
+				return false;
+			}
+		}
 		$sCFDUID = $aCookies['__cfduid'];
 
 		//authorise call
@@ -357,6 +379,15 @@ class GymHuntrBot extends Bot {
 				'Cookie: __cfduid='.$sCFDUID
 			)
 		);
+		if(!is_array($aCookies) || !array_key_exists('cf_uid', $aCookies)) {
+			if($iRetries < 5) {
+				$this->_getProxy(true);
+				return $this->_getGyms($fLatitude, $fLongitude, ++$iRetries);
+			}
+			else {
+				return false;
+			}
+		}
 
 		$iTime = time();
 
@@ -405,7 +436,7 @@ class GymHuntrBot extends Bot {
 		return $aScan;
 	}
 
-	protected function _findGym($sGymId, $aGyms) {
+	protected static function _findGym($sGymId, $aGyms) {
 		$aFiltered = array_filter($aGyms, function($sGym) use ($sGymId) { return preg_match('/\"gym_id"\:\"'.preg_quote($sGymId, '/').'\"/', $sGym); });
 		if(count($aFiltered) == 1) {
 			$aGym = json_decode(current($aFiltered), true);
@@ -413,13 +444,32 @@ class GymHuntrBot extends Bot {
 		}
 	}
 
-	protected function _formatTimestamp($iTimestamp) {
+	public function _formatRaids($sChatId, $aGyms, $sMessage, $bKeyboard = true, $aDeleteMessage = null) {
+		$aFoundRaids = array();
+		foreach($aGyms['raids'] as $sRaid) {
+			$aRaid = json_decode($sRaid, true);
+			if($aRaid) {
+				$aFoundRaids[] = (empty($aRaid['raid_boss_id'])?"\xF0\x9F\x8D\xB3":$this->aConfig['pokemon'][$aRaid['raid_boss_id']]).' '.implode('', array_fill(0, $aRaid['raid_level'], "\xE2\xAD\x90")).' from '.static::_formatTimestamp($sChatId, $aRaid['raid_battle_ms'] / 1000).' to '.static::_formatTimestamp($sChatId, $aRaid['raid_end_ms'] / 1000).' at '.static::_findGym($aRaid['gym_id'], $aGyms['gyms']);
+			}
+		}
+
+		if(!is_null($aDeleteMessage)) {
+			$this->deleteMessage($sChatId, $this->getMessageId($aDeleteMessage));
+		}
+
+		return $this->sendMessage($sChatId, "{$sMessage}:\n".implode("\n", $aFoundRaids), null, false, true, 'Markdown', $bKeyboard?$this->getKeyboard():null);
+	}
+
+	protected static function _formatTimestamp($sChatId, $iTimestamp) {
+		$oSession = Session::getSingleton();
+		$aLocation = $oSession->retrieveValue($sChatId, 'location');
+
 		$oDateTime = new DateTime('@'.intval($iTimestamp));
-		$oDateTime->setTimezone(static::_get_nearest_timezone($_SESSION['location']['latitude'], $_SESSION['location']['longitude'], static::_getCountryCode($_SESSION['location']['latitude'], $_SESSION['location']['longitude'])));
+		$oDateTime->setTimezone(static::_get_nearest_timezone($aLocation['latitude'], $aLocation['longitude'], static::_getCountryCode($aLocation['latitude'], $aLocation['longitude'])));
 		return $oDateTime->format('Y-m-d H:i:s');
 	}
 
-	public static function _getCountryCode($fLatitude, $fLongitude) {
+	protected static function _getCountryCode($fLatitude, $fLongitude) {
 		$aResults = json_decode(file_get_contents('https://maps.googleapis.com/maps/api/geocode/json?latlng='.$fLatitude.','.$fLongitude.'&sensor=false'), true);
 
 		if(is_array($aResults)) {
@@ -436,7 +486,7 @@ class GymHuntrBot extends Bot {
 	}
 
 	//from https://stackoverflow.com/questions/3126878/get-php-timezone-name-from-latitude-and-longitude?noredirect=1&lq=1
-	public static function _get_nearest_timezone($cur_lat, $cur_long, $country_code = '') {
+	protected static function _get_nearest_timezone($cur_lat, $cur_long, $country_code = '') {
 		$timezone_ids = ($country_code) ? DateTimeZone::listIdentifiers(DateTimeZone::PER_COUNTRY, $country_code)
 										: DateTimeZone::listIdentifiers();
 
