@@ -457,6 +457,10 @@ class GymHuntrBot extends Bot {
 			$this->deleteMessage($sChatId, $this->getMessageId($aDeleteMessage));
 		}
 
+		if(empty($aFoundRaids)) {
+			return false;
+		}
+
 		return $this->sendMessage($sChatId, "{$sMessage}:\n".implode("\n", $aFoundRaids), null, false, true, 'Markdown', $bKeyboard?$this->getKeyboard():null);
 	}
 

@@ -19,7 +19,8 @@ class GymHuntrScheduler extends Scheduler {
 			$aGyms = $this->oBot->_getGyms($aLocation['latitude'], $aLocation['longitude']);
 
 			if(empty($aGyms) || empty($aGyms['raids'])) {
-				continue;
+				//to delete stored message
+				$aGyms = array('raids' => array());
 			}
 
 			if($oSession->storedValue($aLocation['chat_id'], 'last_message_for_'.$sLocation)) {
@@ -32,7 +33,13 @@ class GymHuntrScheduler extends Scheduler {
 			//to be used in GymHuntrBot::_formatTimestamp
 			$oSession->storeValue($aLocation['chat_id'], 'location', $aLocation);
 
-			$oSession->storeValue($aLocation['chat_id'], 'last_message_for_'.$sLocation, $this->oBot->_formatRaids($aLocation['chat_id'], $aGyms, 'RAIDs in '.ucfirst($sLocation), false, $aDeleteMessage));
+			$aResult = $this->oBot->_formatRaids($aLocation['chat_id'], $aGyms, 'RAIDs in '.ucfirst($sLocation), false, $aDeleteMessage);
+			if($aResult === false) {
+				$oSession->deleteValue($aLocation['chat_id'], 'last_message_for_'.$sLocation);
+			}
+			else {
+				$oSession->storeValue($aLocation['chat_id'], 'last_message_for_'.$sLocation, $aResult);
+			}
 		}
 	}
 }
