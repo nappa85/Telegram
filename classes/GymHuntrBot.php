@@ -166,7 +166,7 @@ class GymHuntrBot extends Bot {
 		foreach($aGyms['gyms'] as $sGym) {
 			$aGym = json_decode($sGym, true);
 			if($aGym) {
-				$aFoundGyms[] = '['.$aGym['gym_name'].'](http://www.google.com/maps/place/'.$aGym['longitude'].','.$aGym['latitude'].') owned by '.$this->_getTeamIcon($aGym['team_id']).' prestige '.$aGym['gym_points'];
+				$aFoundGyms[] = static::_formatGym($aGym);
 			}
 		}
 
@@ -250,7 +250,11 @@ class GymHuntrBot extends Bot {
 		);
 	}
 
-	protected function _getTeamIcon($iTeamId) {
+	public static function _formatGym($aGym) {
+		return '['.$aGym['gym_name'].'](http://www.google.com/maps/place/'.$aGym['longitude'].','.$aGym['latitude'].') owned by '.static::_getTeamIcon($aGym['team_id']).' prestige '.$aGym['gym_points'];
+	}
+
+	protected static function _getTeamIcon($iTeamId) {
 		switch($iTeamId) {
 			case 1:
 				return "\xE2\x9D\x84";//blue
