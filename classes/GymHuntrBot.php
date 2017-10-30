@@ -351,6 +351,9 @@ class GymHuntrBot extends Bot {
 	 * }
 	 */
 	public function _getGyms($fLatitude, $fLongitude, $iRetries = 0) {
+		//always change proxy at every call
+		$this->_getProxy(true);
+
 		//call index to obtain __cfduid cookie
 		list($sResponse, $aHeaders, $aCookies) = $this->_callGymHuntr(
 			'https://gymhuntr.com/#'.$fLatitude.','.$fLongitude,
