@@ -6,7 +6,9 @@ BOT_NAME = "<bot's nickname>";
 DEVELOPER_CHAT_ID = "<your personal chat id, to receive suggestions>";
 
 [params]
-email = "<a valid Facebook account email>"
-pass = "<a valid Facebook account password>"
-profile = "<target profile url, excluding facebook.com>"
+template_id = ""
+username = "<insert username for https://api.imgflip.com/>"
+password = "<insert password for https://api.imgflip.com/>"
+text0 = ""
+text1 = ""
 ;*/ ?>

@@ -41,7 +41,7 @@ class Session {
 	 */
 	 function isAlreadyProcessed($sMessageId) {
 		if($this->bUseSessions) {
-			return ($_SESSION['processed_messages'][$sMessageId] === true);
+			return array_key_exists($sMessageId, $_SESSION['processed_messages']) && ($_SESSION['processed_messages'][$sMessageId] === true);
 		}
 		else {
 			return file_exists(__DIR__.'/../processed_messages/'.$sMessageId);
@@ -138,7 +138,7 @@ class Session {
 	 */
 	public function storedMessage($sChatId, $sMessageId) {
 		if($this->bUseSessions) {
-			return array_key_exists('m'.$sKey, $_SESSION);
+			return array_key_exists('m'.$sMessageId, $_SESSION);
 		}
 		else {
 			return file_exists(__DIR__.'/../stored_messages/'.$sChatId.'/'.$sMessageId.'.json');

@@ -71,12 +71,39 @@ abstract class Bot {
 	}
 
 	/**
-	 * Retrieves the message's chat id
+	 * Retrieves the message's entity type
 	 * @param   $message    array   the message
 	 * @returns string
 	 */
-	protected function isResult($aJson) {
-		return array_key_exists('result', $aJson);
+	protected function getEntityType($aJson) {
+		switch(true) {
+			case array_key_exists('result', $aJson):
+				return 'result';
+			case array_key_exists('message', $aJson):
+				return 'message';
+			case array_key_exists('callback_query', $aJson):
+				return 'callback_query';
+			default:
+				throw new Exception('Unknown entity type '.json_encode($aJson));
+		}
+	}
+
+	/**
+	 * Retrieves the message's entity
+	 * @param   $message    array   the message
+	 * @returns array
+	 */
+	protected function &getEntity($aJson) {
+		switch(true) {
+			case array_key_exists('result', $aJson):
+				return $aJson['result'];
+			case array_key_exists('message', $aJson):
+				return $aJson['message'];
+			case array_key_exists('callback_query', $aJson):
+				return $aJson['callback_query']['message'];
+			default:
+				throw new Exception('Unknown entity type '.json_encode($aJson));
+		}
 	}
 
 	/**
@@ -85,7 +112,7 @@ abstract class Bot {
 	 * @returns string
 	 */
 	protected function getChatId($aJson) {
-		return $aJson[$this->isResult($aJson)?'result':'message']['chat']['id'];
+		return $this->getEntity($aJson)['chat']['id'];
 	}
 
 	/**
@@ -94,7 +121,7 @@ abstract class Bot {
 	 * @returns string
 	 */
 	protected function getMessageId($aJson) {
-		return $aJson[$this->isResult($aJson)?'result':'message']['message_id'];
+		return $this->getEntity($aJson)['message_id'];
 	}
 
 	/**
@@ -103,7 +130,7 @@ abstract class Bot {
 	 * @returns string
 	 */
 	protected function getMessageText($aJson) {
-		return $aJson[$this->isResult($aJson)?'result':'message']['text'];
+		return $this->getEntity($aJson)['text'];
 	}
 
 	/**
@@ -112,7 +139,7 @@ abstract class Bot {
 	 * @returns string
 	 */
 	protected function getReplyToMessageId($aJson) {
-		return $aJson[$this->isResult($aJson)?'result':'message']['reply_to_message']['message_id'];
+		return $this->getEntity($aJson)['reply_to_message']['message_id'];
 	}
 
 	/**
@@ -198,7 +225,7 @@ abstract class Bot {
 		while($oSession->storedMessage($sChatId, $sMessageId)) {
 			$aJson = $oSession->retrieveStoredMessage($sChatId, $sMessageId);
 
-			if(!$this->isResult($aJson)) {
+			if($this->getEntityType($aJson) != 'result') {
 				list($sMethod, $aNewParts) = $this->getMethodAndArguments($this->getMessageText($aJson));
 				$aParts = array_merge($aNewParts, $aParts);
 			}
@@ -658,7 +685,8 @@ abstract class Bot {
 			return $this->storeMessage($this->sendMessage($this->getChatId($aJson), 'Now insert the suggestion text', $this->getMessageId($aJson), true));
 		}
 
-		$this->sendMessage($this->aConfig['DEVELOPER_CHAT_ID'], 'New suggestion received from ['.$aJson['message']['from']['first_name'].' '.$aJson['message']['from']['last_name'].'](tg://user?id='.$aJson['message']['from']['id'].'): '.$sSuggestion, null, false, true, 'Markdown');
+		$aEntity = $this->getEntity($aJson);
+		$this->sendMessage($this->aConfig['DEVELOPER_CHAT_ID'], 'New suggestion received from ['.$aEntity['from']['first_name'].' '.$aEntity['from']['last_name'].'](tg://user?id='.$aEntity['from']['id'].'): '.$sSuggestion, null, false, true, 'Markdown');
 		$this->recursivelyDeleteStoredMessage($this->getChatId($aJson), $this->getReplyToMessageId($aJson));
 
 		return $this->sendMessage($this->getChatId($aJson), 'Thank you for your suggestion.');
