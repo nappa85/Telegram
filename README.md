@@ -1,7 +1,9 @@
 # Telegram
-> This is a really simple Telegram Bot system, designed to be database-less.
-> Can work with php sessions or on files.
-> It has a double token security system to be sure only trusted sources can contact it.
+<p>
+This is a really simple Telegram Bot system, designed to be database-less.<br />
+Can work with php sessions or on files.<br />
+It has a double token security system to be sure only trusted sources can contact it.
+</p>
 
 Already implemented Bots are:
 * BlasphemyBot - A simple Bot who can offend anyone without discriminations
