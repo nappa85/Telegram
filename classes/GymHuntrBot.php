@@ -354,6 +354,10 @@ class GymHuntrBot extends Bot {
 		//always change proxy at every call
 		$this->_getProxy(true);
 
+		//gymhuntr is blocking multiple request on the same longitude and latitude, so we'll change it a bit
+		$fLatitude += rand(-1000, 1000) / 100000;
+		$fLongitude += rand(-1000, 1000) / 100000;
+
 		//call index to obtain __cfduid cookie
 		list($sResponse, $aHeaders, $aCookies) = $this->_callGymHuntr(
 			'https://gymhuntr.com/#'.$fLatitude.','.$fLongitude,
@@ -451,11 +455,18 @@ class GymHuntrBot extends Bot {
 		}
 	}
 
-	public function _formatRaids($sChatId, $aGyms, $sMessage, $bKeyboard = true, $aDeleteMessage = null) {
+	public function _formatRaids($sChatId, $aGyms, $sMessage, $bKeyboard = true, $aDeleteMessage = null, $sFilterGymId = null, $bSingleNotify = false) {
+		$oSession = Session::getSingleton();
+		$aNotifiedRaids = $oSession->retrieveValue($sChatId, 'notifiedRaids');
+		if(empty($aNotifiedRaids)) {
+			$aNotifiedRaids = array();
+		}
+
 		$aFoundRaids = array();
 		foreach($aGyms['raids'] as $sRaid) {
 			$aRaid = json_decode($sRaid, true);
-			if($aRaid) {
+			if($aRaid && (is_null($sFilterGymId) || ($sFilterGymId == $aRaid['gym_id'])) && (!$bSingleNotify || !in_array($aRaid['_id'], $aNotifiedRaids))) {
+				$aNotifiedRaids[] = $aRaid['_id'];
 				$aFoundRaids[] = (empty($aRaid['raid_boss_id'])?"\xF0\x9F\x8D\xB3":$this->aConfig['pokemon'][$aRaid['raid_boss_id']]).' '.implode('', array_fill(0, $aRaid['raid_level'], "\xE2\xAD\x90")).' from '.static::_formatTimestamp($sChatId, $aRaid['raid_battle_ms'] / 1000).' to '.static::_formatTimestamp($sChatId, $aRaid['raid_end_ms'] / 1000).' at '.static::_findGym($aRaid['gym_id'], $aGyms['gyms']);
 			}
 		}
@@ -466,6 +477,10 @@ class GymHuntrBot extends Bot {
 
 		if(empty($aFoundRaids)) {
 			return false;
+		}
+
+		if($bSingleNotify) {
+			$oSession->storeValue($sChatId, 'notifiedRaids', $aNotifiedRaids);
 		}
 
 		return $this->sendMessage($sChatId, "{$sMessage}:\n".implode("\n", $aFoundRaids), null, false, true, 'Markdown', $bKeyboard?$this->getKeyboard():null);
